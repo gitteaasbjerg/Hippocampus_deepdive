@@ -1,0 +1,102 @@
+---
+title: "Zhong_expression_file"
+author: "Gitte Aasbjerg"
+date: "05/11/2020"
+output: html_document
+---
+
+# Load data
+```{r}
+library("Seurat")
+Zhong.data <- Read10X(data.dir = "/home/cbmr/kzd307/gitte/hippocampus/data/Zhong_expression_data/")
+```
+
+
+#-------------- Remove cells expressing haemoglobin genes --------------
+
+
+# Run SCTransform
+```{r}
+SCTdata <- CreateSeuratObject(counts=Zhong.data)
+SCTdata <- PercentageFeatureSet(SCTdata, pattern = "^MT-", col.name = "percent.mt")
+SCTdata <- SCTransform(SCTdata, vars.to.regress = "percent.mt", verbose = FALSE)
+```
+
+# Run PCA and UMAP to cluster data
+```{r}
+SCTdata <- RunPCA(SCTdata, verbose = FALSE)
+SCTdata <- RunUMAP(SCTdata, dims = 1:15, verbose = FALSE)
+
+SCTdata <- FindNeighbors(SCTdata, dims = 1:15, verbose = FALSE)
+SCTdata <- FindClusters(SCTdata, verbose = FALSE)
+
+DimPlot(SCTdata, label = TRUE) + NoLegend()
+```
+
+# Locate cluster with cells expressing haemolglobin
+```{r}
+haemoglobin <- FeaturePlot(SCTdata, features = c('HBM', 'HBA1', 'HBA2', 'HBB', 'HBD', 'HBE1', 'HBG1', 'HBG2', 'HBQ1', 'HBZ'), pt.size = 0.2, ncol = 3)
+haemoglobin
+```
+
+# Identify cells from cluster 12 and 13 
+```{r}
+remove_clusters <- which(SCTdata@meta.data$seurat_clusters == 13 | SCTdata@meta.data$seurat_clusters == 12) 
+all.cells <- colnames(SCTdata)
+remove_cells <- all.cells[remove_clusters]
+```
+
+
+
+#--------------- Initiate original pre-processing steps --------------------
+
+
+# Read 10X data and create Seurat Object and exclude cells expressing haemoglobin genes
+```{r}
+data <- CreateSeuratObject(counts=Zhong.data)
+data <- data[,!colnames(data) %in% remove_cells]
+```
+
+# Perform SCTransform of reduced data and remove cells expressing mitochondrial genes
+```{r}
+data <- PercentageFeatureSet(data, pattern = "^MT-", col.name = "percent.mt")
+data <- SCTransform(data, vars.to.regress = "percent.mt", verbose = FALSE)
+```
+
+# Evalutate number of dimensions in the data
+```{r}
+ElbowPlot(data)
+DimHeatmap(data, dims = 1:15, cells = 500, balanced = TRUE)
+```
+
+# Dimensions is set to be 13 based on the above results. The data is then clustered
+```{r}
+data <- RunPCA(data, verbose = FALSE)
+data <- RunUMAP(data, dims = 1:13, verbose = FALSE)
+
+data <- FindNeighbors(data, dims = 1:13, verbose = FALSE)
+data <- FindClusters(data, verbose = FALSE)
+
+DimPlot(data, label = TRUE) + NoLegend()
+```
+
+# Save expression file and cluster annotations
+```{r}
+
+# Expression matrix
+data_matrix <- as.matrix(GetAssayData(object = data, slot = "counts"))
+write.csv(data_matrix, file="../data/Zhong_expression_matrix.csv")
+
+
+# Cluster annotations
+gene_list <- as.matrix(colnames(data))
+cluster <- as.matrix(as.numeric(data@meta.data$seurat_clusters))
+cluster_annotation = cbind(gene_list, cluster)
+
+# Write cluster annotation file
+write.csv(cluster_annotation, file = "Zhong_cluster_annotation.csv")
+
+saveRDS(data, file = "../data/Zhong_SCTransformed.rds")
+
+```
+
