@@ -1,0 +1,99 @@
+---
+title: "label_transfer"
+author: "Gitte Aasbjerg"
+date: "12/3/2020"
+output: html_document
+---
+
+
+### Transfer labels from Saunders to Zhong
+```{r}
+# Read and perform SCTransform on saunders data
+data.zhong <- readRDS("../data/Zhong_SCTransformed.rds")
+data.saunders <- readRDS("/data/pub-others/saunders-mousebrain-2018/seurat_obj/saunders_hippocampus.annotated2018.seurat_obj.RDS.gz")
+
+# SCTransform data to enable detection of anchors
+data.saunders <- SCTransform(data.saunders, verbose = FALSE, )
+
+# find transfer anchors
+hip.anchors <- FindTransferAnchors(reference = data.saunders, normalization.method = "SCT",
+                                        query = data.zhong, dims = 1:30, reference.assay = "SCT",
+                                        query.assay = "SCT", reduction = "cca")
+```
+
+
+```{r}
+library('tidyverse')
+
+# Tissue
+predictions_tissue <- TransferData(anchorset = hip.anchors,
+                            refdata = data.saunders@meta.data$tissue, dims = 1:30, weight.reduction = "cca")
+
+predictions_tissue <- predictions_tissue %>% 
+  select(predicted.id, prediction.score.max) %>% 
+  rename(prediction.tissue = predicted.id, tissue.score =prediction.score.max) %>%
+  rownames_to_column() 
+
+
+# Full name
+predictions_fullname <- TransferData(anchorset = hip.anchors,
+                            refdata = data.saunders@meta.data$full_name, dims = 1:30, weight.reduction = "cca")
+
+predictions_fullname <- predictions_fullname %>% 
+  select(predicted.id, prediction.score.max) %>% 
+  rename(prediction.full_name = predicted.id, full_name.score =prediction.score.max) %>%
+  rownames_to_column() 
+
+
+# Tissue Subcluster
+predictions_tissue_subcluster <- TransferData(anchorset = hip.anchors,
+                            refdata = data.saunders@meta.data$tissue_subcluster, dims = 1:30, weight.reduction = "cca")
+
+predictions_tissue_subcluster <- predictions_tissue_subcluster %>% 
+  select(predicted.id, prediction.score.max) %>% 
+  rename(prediction.tissue_subcluster = predicted.id, tissue_subcluster.score =prediction.score.max) %>%
+  rownames_to_column() 
+
+
+# Common name
+predictions_commonname <- TransferData(anchorset = hip.anchors,
+                            refdata = data.saunders@meta.data$common_name, dims = 1:30, weight.reduction = "cca")
+
+predictions_commonname <- predictions_commonname %>% 
+  select(predicted.id, prediction.score.max) %>% 
+  rename(prediction.common_name = predicted.id, common_name.score =prediction.score.max) %>%
+  rownames_to_column() 
+
+
+# Class
+predictions_class <- TransferData(anchorset = hip.anchors,
+                            refdata = data.saunders@meta.data$class, dims = 1:30, weight.reduction = "cca")
+
+predictions_class <- predictions_class %>% 
+  select(predicted.id, prediction.score.max) %>% 
+  rename(prediction.class = predicted.id, class.score =prediction.score.max) %>%
+  rownames_to_column() 
+```
+
+
+```{r}
+# Joined together
+meta <- left_join(predictions_tissue, predictions_fullname,) %>% 
+  left_join(.,predictions_tissue_subcluster) %>%
+  left_join(.,predictions_commonname) %>%
+  left_join(.,predictions_class) %>%
+  remove_rownames %>% 
+  column_to_rownames(var="rowname")
+
+
+# Merge joined meta-data with seurat object and safe as RDS
+data.zhong <- AddMetaData(data.zhong, metadata = meta)
+saveRDS(data.zhong, file = "../data/Zhong_w_metadata.rds")
+```
+
+
+```{r}
+# Visual analysis
+VlnPlot(data.zhong, c("CALB2", "VGLL3","VIP","CD44","PDE11A", "CCK"), group.by = "prediction.class", pt.size = 0.5)
+```
+

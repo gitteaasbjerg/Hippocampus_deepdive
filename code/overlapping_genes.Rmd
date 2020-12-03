@@ -1,0 +1,63 @@
+---
+title: "overlapping_genes"
+author: "Gitte Aasbjerg"
+date: "12/3/2020"
+output: html_document
+---
+
+
+### Find genes that overlap between cluster from Zhong and Saunders
+```{r}
+# Load list of genes expressed in relevant cluster(s) 
+gene.saunders <- read.csv(file = '../data/genelist/saunders_cellex_Neuron.Slc17a7.Calb2_Vgll3_cellex_genes.csv',sep = ";")
+gene.zhong <- read.csv(file = '../data/genelist/zhong_cellex_X8_cellex_genes.csv', sep = ";")
+
+# Filter data on ES threshold
+ES_threshold <- 0.2
+
+gene.zhong <- gene.zhong[gene.zhong$ES>ES_threshold,]
+gene.saunders <- gene.saunders[gene.saunders$ES>ES_threshold,]
+
+```
+
+
+```{r}
+library('GeneOverlap')
+
+# Perform hypergeometric test on genes from the two clusters 
+go <- newGeneOverlap(gene.saunders$Gene, gene.zhong$Gene)
+go.obj <- testGeneOverlap(go)
+go.obj
+```
+
+
+```{r}
+
+# Detect genes present in both clusters
+gene.overlap <- intersect(gene.saunders$Gene, gene.zhong$Gene)
+
+# Extract overlapping genes and coresponding ES values 
+s <- gene.saunders[gene.saunders$Gene %in% gene.overlap,] %>%
+  arrange(desc(Gene)) %>%
+  rename(gene = 1, saunders = 2)   %>%
+  mutate(saunders = as.numeric(saunders))
+
+z <- gene.zhong[gene.zhong$Gene %in% gene.overlap,] %>%
+  arrange(desc(Gene)) %>%
+  rename(delete = 1, zhong = 2) %>%
+  mutate(zhong = as.numeric(zhong)) 
+
+# Merge gene-names with corresponding ES values for saunders and zhong
+sz <- cbind(z,s) %>% 
+  select(-1) %>%
+  mutate(product = zhong * saunders) %>%
+  column_to_rownames(var = "gene") %>%
+  arrange(desc(product)) 
+
+# Save as csv
+write.csv(sz, file = "../data/overlapping_genes.csv")
+
+```
+
+
+

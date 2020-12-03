@@ -1,0 +1,36 @@
+---
+title: "CELLEX_extract"
+author: "Gitte Aasbjerg"
+date: "12/3/2020"
+output: html_document
+---
+
+### Exrtact gene names and ES values from CELLEX output
+```{r}
+library(dplyr)
+library(Seurat)
+
+# Load data
+esmu.zhong <- read.csv(file = '../data/Zhong2_cellex_human/Zhong2_hippocampus_mouse_cells.esmu.csv.gz')
+esmu.saunders <- read.csv(file = '/home/cbmr/qwn903/my_tools/output/saunders_mousebrain_Hippocampus_ens.esmu.csv.gz')
+
+```
+
+```{r}
+
+# Extract only non-zero ES values and sort genes based on ES
+saunders.non_zero <- esmu.saunders %>%
+  select(gene, Neuron.Slc17a7.Calb2_Vgll3) %>%
+  arrange(desc(Neuron.Slc17a7.Calb2_Vgll3)) %>%
+  filter(Neuron.Slc17a7.Calb2_Vgll3 > 0)
+
+zhong.non_zero <- esmu.zhong %>%
+  select(gene, X8) %>%
+  arrange(desc(X8)) %>%
+  filter(X8 > 0)
+
+# Save dataframe of genes and ES values 
+write.csv(zhong.non_zero, file = "../data/zhong_cellex_X8_cellex_genes.csv")
+write.csv(saunders.non_zero, file = "../data/saunders_cellex_Neuron.Slc17a7.Calb2_Vgll3_cellex_genes.csv")
+```
+
