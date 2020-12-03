@@ -1,0 +1,56 @@
+---
+title: "Saunders_expression_file"
+author: "Gitte Aasbjerg"
+date: "13/11/2020"
+output: html_document
+---
+
+# Load data
+```{r}
+library("Seurat")
+Saunders.data <- readRDS("../data/mouse_hippocampus_reference.rds")
+```
+
+
+# Run SCTransform and regress cells expressing mitochondrial genes 
+```{r}
+data <- PercentageFeatureSet(Saunders.data, pattern = "^MT-", col.name = "percent.mt")
+data <- SCTransform(data, vars.to.regress = "percent.mt", verbose = FALSE)
+```
+
+# Run PCA and UMAP to cluster data
+```{r}
+data <- RunPCA(data, verbose = FALSE)
+data <- RunUMAP(data, dims = 1:15, verbose = FALSE)
+
+data <- FindNeighbors(data, dims = 1:15, verbose = FALSE)
+data <- FindClusters(data, verbose = FALSE)
+
+DimPlot(data, label = TRUE) + NoLegend()
+```
+
+
+# Save expression file, cluster annotations, and SCTransformed Seurat Object
+```{r}
+# Expression matrix
+data_matrix <- as.matrix(GetAssayData(object = data, slot = "counts"))
+
+# Write expression data
+write.csv(data_matrix, file="../data/Saunders_expression_matrix.csv")
+
+# ----------
+
+# Cluster annotations
+gene_list <- as.matrix(colnames(data))
+cluster <- as.matrix(as.numeric(data@meta.data$subcluster))
+cluster_annotation = cbind(gene_list, cluster)
+
+# Write cluster annotation file
+write.csv(cluster_annotation, file = "../data/Zhong_subcluster_annotation.csv")
+
+# ---------
+
+# Write transformed data as RDS file
+saveRDS(data, file = "../data/Saunders_SCTransformed.rds")
+
+```
